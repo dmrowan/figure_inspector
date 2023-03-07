@@ -243,6 +243,7 @@ def classify(folder, buttons=['yes', 'no']):
 
                 log.classify(classification, comment=values['-comment-'], user=user)
                 log.move_forward()
+                window['-comment-'].update("")
         
             if log.start_index != len(log.df) - 1:
 
