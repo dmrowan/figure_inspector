@@ -66,7 +66,7 @@ class Log:
         self.df = df
 
         self.start_index = None
-        log.logfile_path = None
+        self.logfile_path = None
 
     def add_log(self, file):
         
@@ -77,8 +77,6 @@ class Log:
         self.df = self.df.merge(df_existing, how='left', on='id')
         self.df = self.df.reset_index(drop=True)
         self.df = self.df.fillna('')
-
-        print(self.df)
 
         self.logfile_path = file
 
@@ -136,8 +134,7 @@ def classify(folder, buttons=['yes', 'no']):
             [ sg.Text('Comment'), sg.In(key='-comment-', size=(12, 1))],
             [ sg.Button('Go Back', key='-go-back-') ]]
 
-    image_col = [[sg.Text('Currently Classifying:')],
-                 [sg.Text(size=(80, 1), key='-TOUT-')],
+    image_col = [[sg.Text('Currently Classifying:', key='-TOUT-', font=("Helvetica", 30))],
                  [sg.Image(key='-IMAGE-', size=(300, 300))]]
 
     layout=[[sg.Column(left_col, element_justification='c'),
@@ -159,7 +156,6 @@ def classify(folder, buttons=['yes', 'no']):
     df_log = None
     files_to_classify = None
     classification = None
-    previous = None
     logfile_path = None
     need_to_resize=False
 
@@ -188,6 +184,7 @@ def classify(folder, buttons=['yes', 'no']):
         elif event == '-newlogfile-':
             logfile_path = values['-newlogfile_path-']
             if os.path.isfile(logfile_path):
+                print(f'{logfile_path} already exists')
                 continue
             log.logfile_path = logfile_path
             log.set_order()
@@ -196,7 +193,6 @@ def classify(folder, buttons=['yes', 'no']):
             log.move_backwards()
             try:
                 image = log.df.file.iloc[log.current_index]
-                print(image)
                 
                 new_size = window.size
                 if new_size != current_size:
@@ -204,14 +200,9 @@ def classify(folder, buttons=['yes', 'no']):
                 else:
                     need_to_resize=False
 
-                if log.start_index != 0:
-                    previous = log.df.id.iloc[log.current_index - 1]
-                else:
-                    previous = None
-
 
                 window['-TOUT-'].update(
-                        f'previous:{previous} current: {log.df.id.iloc[log.current_index]}')
+                        f'Currently Classifying: {log.df.id.iloc[log.current_index]}')
                 if need_to_resize:
                     resize=window['-IMAGE-'].get_size()
                 else:
@@ -249,7 +240,6 @@ def classify(folder, buttons=['yes', 'no']):
 
                 try:
                     image = log.df.file.iloc[log.current_index]
-                    print(image, 'main')
                     
 
                     new_size = window.size
@@ -258,14 +248,8 @@ def classify(folder, buttons=['yes', 'no']):
                     else:
                         need_to_resize=False
 
-                    if log.start_index != 0:
-                        previous = log.df.id.iloc[log.current_index - 1]
-                    else:
-                        previous = None
-
-
                     window['-TOUT-'].update(
-                            f'previous:{previous} current: {log.df.id.iloc[log.current_index]}')
+                            f'Currently Classifying: {log.df.id.iloc[log.current_index]}')
                     if need_to_resize:
                         resize=window['-IMAGE-'].get_size()
                     else:
@@ -290,7 +274,3 @@ def classify(folder, buttons=['yes', 'no']):
         log.write_log()
         pass
         
-
-if __name__ == '__main__':
-    
-    classify()
