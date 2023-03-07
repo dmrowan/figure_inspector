@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-from astropy import log
 import argparse
 import io
 import numpy as np
@@ -49,6 +48,80 @@ def convert_to_bytes(file_or_bytes, resize=None):
         del img
         return bio.getvalue()
 
+
+class Log:
+
+    def __init__(self, folder):
+        
+        if not utils.check_iter(folder):
+            files = [ os.path.join(folder, x)
+                         for x in os.listdir(folder)
+                         if (x.endswith('.jpg') or x.endswith('.jpeg'))]
+        else:
+            files = folder
+
+        df = pd.DataFrame({'file':files})
+        df['id'] = [ os.path.splitext(os.path.split(f)[-1])[0] for f in df.file ]
+        df['id'] = df.id.astype(str)
+        self.df = df
+
+        self.start_index = None
+        log.logfile_path = None
+
+    def add_log(self, file):
+        
+        df_existing = pd.read_csv(file, header=None)
+        df_existing.columns = ['id', 'user', 'class', 'comment']
+        df_existing['id'] = df_existing.id.astype(str)
+
+        self.df = self.df.merge(df_existing, how='left', on='id')
+        self.df = self.df.reset_index(drop=True)
+        self.df = self.df.fillna('')
+
+        print(self.df)
+
+        self.logfile_path = file
+
+    def set_order(self):
+
+        for c in ['user', 'class', 'comment']:
+            if c not in self.df.columns:
+                self.df[c] = ''
+
+        idx = np.where(self.df['class'] == '')[0]
+
+        df_rand = self.df.iloc[idx].sample(frac=1)
+        df_classified = self.df.iloc[~self.df.index.isin(idx)]
+       
+        self.df = pd.concat([df_classified, df_rand]).reset_index(drop=True)
+        
+        self.start_index = len(df_classified)
+        self._current_index = self.start_index
+
+    @property
+    def current_index(self):
+        return self._current_index
+
+    def move_forward(self):
+        if self._current_index < len(self.df) - 1:
+            self._current_index += 1
+
+    def move_backwards(self):
+        if self._current_index > self.start_index + 1:
+            self._current_index -= 1
+        
+    def classify(self, classification, comment='', user=os.getlogin()):
+        
+        self.df['class'].iat[self.current_index] = classification
+        self.df['comment'].iat[self.current_index] = comment
+        self.df['user'].iat[self.current_index] = user
+
+    def write_log(self):
+        
+        idx = np.where(self.df['class'] != '')[0]
+        self.df[['id', 'user', 'class', 'comment']].iloc[idx].to_csv(self.logfile_path, header=None, index=False)
+
+
 def classify(folder, buttons=['yes', 'no']):
     
     sg.theme("DarkGrey")
@@ -79,12 +152,9 @@ def classify(folder, buttons=['yes', 'no']):
 
     window.bind('<Configure>',"window_resize_event")
 
-    if not utils.check_iter(folder):
-        files = [ os.path.join(folder, x)
-                     for x in os.listdir(folder)
-                     if (x.endswith('.jpg') or x.endswith('.jpeg'))]
-    else:
-        files = folder
+    log = Log(folder)
+    user = os.getlogin()
+
 
     df_log = None
     files_to_classify = None
@@ -108,81 +178,93 @@ def classify(folder, buttons=['yes', 'no']):
             break
         elif event == sg.WIN_CLOSED or event=='Exit':
             break
+        elif event == "window_resize_event":
+            continue
         elif event == '-logfile-':
             logfile_path = values['-logfile-']
-            df_log = pd.read_csv(logfile_path, header=None)
+            log.add_log(logfile_path)
+            log.set_order()
         
-            files_to_classify = [
-                    f for f in files_to_classify
-                    if (os.path.splitext(os.path.split(f)[-1])[0]
-                        not in list(df_log[df_log.columns[0]]).astype(str)) ]
-
-            random.shuffle(files_to_classify)
-
         elif event == '-newlogfile-':
             logfile_path = values['-newlogfile_path-']
             if os.path.isfile(logfile_path):
-                log.error('logfile already_exists')
                 continue
-            df_log = pd.DataFrame(columns=['id', 'user', 'class', 'comment'])
-            
-            files_to_classify = files
-            random.shuffle(files_to_classify)
+            log.logfile_path = logfile_path
+            log.set_order()
 
+        elif event == '-go-back-':
+            log.move_backwards()
+            try:
+                image = log.df.file.iloc[log.current_index]
+                print(image)
+                
+                new_size = window.size
+                if new_size != current_size:
+                    need_to_resize = True
+                else:
+                    need_to_resize=False
+
+                if log.start_index != 0:
+                    previous = log.df.id.iloc[log.current_index - 1]
+                else:
+                    previous = None
+
+
+                window['-TOUT-'].update(
+                        f'previous:{previous} current: {log.df.id.iloc[log.current_index]}')
+                if need_to_resize:
+                    resize=window['-IMAGE-'].get_size()
+                else:
+                    resize=resize
+                    
+                window['-IMAGE-'].update(
+                        data=convert_to_bytes(image, resize=resize))
+
+                need_to_resize=False
+                current_size = window.size
+
+
+            except Exception as E:
+                print(f' ** Error {E} **')
+                pass
+
+            continue
+            
         elif event in [ f'{b}_key' for b in buttons ] and logfile_path is not None:
             classification = event.split('_key')[0]
             window['-newlogfile_path-'].update(logfile_path)
-
         else:
             pass
 
-        if event == "window_resize_event":
-            continue
 
-        if event == '-go-back-':
-            last_entry = rows_to_append.pop(-1)
-            last_fname = last_entry[0] 
-            print(last_fname)
-            files_to_classify.insert(0, last_fname)
-            print('------')
-            print(files_to_classify[:5])
-            print('------')
-            continue
-
-
-
-        if files_to_classify is not None:
+        if (log.start_index is not None):
             
             if classification is not None:
-                
-                new_row = [image,
-                           os.path.splitext(os.path.split(image)[-1])[0],
-                           user,
-                           classification,
-                           values['-comment-']]
 
-                rows_to_append.append(new_row)
+                log.classify(classification, comment=values['-comment-'], user=user)
+                log.move_forward()
+        
+            if log.start_index != len(log.df) - 1:
 
-            if len(files_to_classify):
-
-                print(files_to_classify[:4])
-                
                 try:
+                    image = log.df.file.iloc[log.current_index]
+                    print(image, 'main')
+                    
+
                     new_size = window.size
                     if new_size != current_size:
                         need_to_resize = True
                     else:
                         need_to_resize=False
-                    image = files_to_classify[0] 
 
-                    if len(rows_to_append):
-                        previous = rows_to_append[-1][0]
+                    if log.start_index != 0:
+                        previous = log.df.id.iloc[log.current_index - 1]
                     else:
                         previous = None
 
 
                     window['-TOUT-'].update(
-                            f'previous:{previous} current: {os.path.splitext(os.path.split(image)[-1])[0]}')
+                            f'previous:{previous} current: {log.df.id.iloc[log.current_index]}')
                     if need_to_resize:
                         resize=window['-IMAGE-'].get_size()
                     else:
@@ -194,8 +276,7 @@ def classify(folder, buttons=['yes', 'no']):
                     need_to_resize=False
                     current_size = window.size
 
-                    #previous = os.path.splitext(os.path.split(image)[-1])[0]
-                    files_to_classify = files_to_classify[1:]
+
                 except Exception as E:
                     print(f' ** Error {E} **')
                     pass
@@ -204,18 +285,9 @@ def classify(folder, buttons=['yes', 'no']):
 
     window.close()
 
-    df_new = pd.DataFrame({'id':[r[0] for r in rows_to_append],
-                           'user':[r[1] for r in rows_to_append],
-                           'class':[r[2] for r in rows_to_append],
-                           'comment':[r[3] for r in rows_to_append]})
-
-    if df_log is None:
-        df_log = df_new
-    else:
-        df_log = pd.concat([df_log, df_new])
-
-    #df_log.to_csv(logfile_path, header=None)
-
+    if log.logfile_path is not None:
+        log.write_log()
+        pass
         
 
 if __name__ == '__main__':
