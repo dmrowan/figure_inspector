@@ -42,7 +42,7 @@ def convert_to_bytes(file_or_bytes, resize=None):
     if resize:
         new_width, new_height = resize
         scale = min(new_height/cur_height, new_width/cur_width)
-        img = img.resize((int(cur_width*scale), int(cur_height*scale)), PIL.Image.ANTIALIAS)
+        img = img.resize((int(cur_width*scale), int(cur_height*scale)), PIL.Image.LANCZOS)
     with io.BytesIO() as bio:
         img.save(bio, format="PNG")
         del img
@@ -121,6 +121,9 @@ class Log:
 
 
 def classify(folder, buttons=['yes', 'no']):
+
+    log = Log(folder)
+    user = os.getlogin()
     
     sg.theme("DarkGrey")
     left_col = [
@@ -135,6 +138,8 @@ def classify(folder, buttons=['yes', 'no']):
             [ sg.Button('Go Back', key='-go-back-') ]]
 
     image_col = [[sg.Text('Currently Classifying:', key='-TOUT-', font=("Helvetica", 30))],
+                 [sg.ProgressBar(max_value=len(log.df), orientation='h',
+                                 size=(200, 20), key='progress')],
                  [sg.Image(key='-IMAGE-', size=(300, 300))]]
 
     layout=[[sg.Column(left_col, element_justification='c'),
@@ -149,9 +154,7 @@ def classify(folder, buttons=['yes', 'no']):
 
     window.bind('<Configure>',"window_resize_event")
 
-    log = Log(folder)
-    user = os.getlogin()
-
+    window['progress'].update(0)
 
     df_log = None
     files_to_classify = None
@@ -180,6 +183,8 @@ def classify(folder, buttons=['yes', 'no']):
             logfile_path = values['-logfile-']
             log.add_log(logfile_path)
             log.set_order()
+
+            window['progress'].update(log.current_index)
         
         elif event == '-newlogfile-':
             logfile_path = values['-newlogfile_path-']
@@ -191,6 +196,7 @@ def classify(folder, buttons=['yes', 'no']):
 
         elif event == '-go-back-':
             log.move_backwards()
+            window['progress'].update(log.current_index)
             try:
                 image = log.df.file.iloc[log.current_index]
                 
@@ -229,6 +235,8 @@ def classify(folder, buttons=['yes', 'no']):
 
 
         if (log.start_index is not None):
+
+            window['progress'].update(log.current_index)
             
             if classification is not None:
 
