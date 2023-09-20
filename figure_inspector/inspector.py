@@ -137,7 +137,8 @@ def classify(folder, buttons=['yes', 'no']):
             [ sg.Text('Comment'), sg.In(key='-comment-', size=(12, 1))],
             [ sg.Button('Go Back', key='-go-back-') ]]
 
-    image_col = [[sg.Text('Currently Classifying:', key='-TOUT-', font=("Helvetica", 30))],
+    image_col = [[sg.InputText('Currently Classifying:', key='-TOUT-', font=("Helvetica", 30),
+                          use_readonly_for_disable=True, disabled=True, text_color="black")],
                  [sg.ProgressBar(max_value=len(log.df), orientation='h',
                                  size=(200, 20), key='progress')],
                  [sg.Image(key='-IMAGE-', size=(300, 300))]]
