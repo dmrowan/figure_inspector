@@ -160,10 +160,10 @@ def classify(folder, buttons=['yes', 'no']):
     files_to_classify = None
     classification = None
     logfile_path = None
-    need_to_resize=False
+    #need_to_resize=False
 
-    current_size = window.size
-    resize=None
+    #current_size = window.size
+    #resize=None
 
     user = os.getlogin()
 
@@ -199,26 +199,34 @@ def classify(folder, buttons=['yes', 'no']):
             window['progress'].update(log.current_index)
             try:
                 image = log.df.file.iloc[log.current_index]
-                
+
+                """
                 new_size = window.size
                 if new_size != current_size:
                     need_to_resize = True
                 else:
                     need_to_resize=False
+                """
 
 
                 window['-TOUT-'].update(
                         f'Currently Classifying: {log.df.id.iloc[log.current_index]}')
-                if need_to_resize:
-                    resize=window['-IMAGE-'].get_size()
-                else:
-                    resize=resize
+                #if need_to_resize:
+                #    resize=window['-IMAGE-'].get_size()
+                #else:
+                #    resize=resize
                     
+                """
                 window['-IMAGE-'].update(
                         data=convert_to_bytes(image, resize=resize))
+                """
+                window_size = window.size
+                target_size = (window_size[0] - 20, window_size[1] - 60)
+                window['-IMAGE-'].update(
+                        data=convert_to_bytes(image, resize=target_size))
 
-                need_to_resize=False
-                current_size = window.size
+                #need_to_resize=False
+                #current_size = window.size
 
 
             except Exception as E:
@@ -248,26 +256,31 @@ def classify(folder, buttons=['yes', 'no']):
 
                 try:
                     image = log.df.file.iloc[log.current_index]
-                    
 
-                    new_size = window.size
-                    if new_size != current_size:
-                        need_to_resize = True
-                    else:
-                        need_to_resize=False
+
+                    #new_size = window.size
+                    #if new_size != current_size:
+                    #    need_to_resize = True
+                    #else:
+                    #    need_to_resize=False
 
                     window['-TOUT-'].update(
                             f'Currently Classifying: {log.df.id.iloc[log.current_index]}')
-                    if need_to_resize:
-                        resize=window['-IMAGE-'].get_size()
-                    else:
-                        resize=resize
+                    #if need_to_resize:
+                    #    resize=window['-IMAGE-'].get_size()
+                    #else:
+                    #    resize=resize
                         
-                    window['-IMAGE-'].update(
-                            data=convert_to_bytes(image, resize=resize))
+                    #window['-IMAGE-'].update(
+                    #        data=convert_to_bytes(image, resize=resize))
 
-                    need_to_resize=False
-                    current_size = window.size
+                    window_size = window.size
+                    target_size = (window_size[0] - 20, window_size[1] - 60)
+                    window['-IMAGE-'].update(
+                            data=convert_to_bytes(image, resize=target_size))
+
+                    #need_to_resize=False
+                    #current_size = window.size
 
 
                 except Exception as E:
