@@ -8,7 +8,7 @@ import pandas as pd
 import random
 import PIL.Image
 import pickle
-import PySimpleGUI as sg
+import FreeSimpleGUI as sg
 
 from . import utils
 
