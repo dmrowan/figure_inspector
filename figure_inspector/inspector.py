@@ -9,6 +9,8 @@ import random
 import PIL.Image
 import pickle
 import FreeSimpleGUI as sg
+#import PySimpleGUI as sg
+from tqdm.auto import tqdm
 
 from . import utils
 
@@ -65,6 +67,22 @@ class Log:
         df['id'] = df.id.astype(str)
         self.df = df
 
+        pixel_limit = PIL.Image.MAX_IMAGE_PIXELS or 178956970
+        PIL.Image.MAX_IMAGE_PIXELS = None
+        too_large = []
+        for i, f in tqdm(enumerate(self.df.file), total=len(self.df), desc='Checking image sizes'):
+            try:
+                with PIL.Image.open(f) as img:
+                    if img.width * img.height > pixel_limit:
+                        too_large.append(i)
+            except Exception:
+                pass
+        PIL.Image.MAX_IMAGE_PIXELS = pixel_limit
+
+        if too_large:
+            print(f'{len(too_large)} file(s) will be skipped (image size > {pixel_limit} pixels)')
+            self.df = self.df.drop(index=too_large).reset_index(drop=True)
+
         self.start_index = None
         self.logfile_path = None
 
@@ -110,12 +128,13 @@ class Log:
         
     def classify(self, classification, comment='', user=os.getlogin()):
         
-        self.df['class'].iat[self.current_index] = classification
-        self.df['comment'].iat[self.current_index] = comment
-        self.df['user'].iat[self.current_index] = user
+        self.df.loc[self.current_index, 'class'] = classification
+        self.df.loc[self.current_index, 'comment'] = comment
+        self.df.loc[self.current_index, 'user'] = user
 
     def write_log(self):
         
+        print(self.df)
         idx = np.where(self.df['class'] != '')[0]
         self.df[['id', 'user', 'class', 'comment']].iloc[idx].to_csv(self.logfile_path, header=None, index=False)
 
@@ -291,6 +310,10 @@ def classify(folder, buttons=['yes', 'no']):
                 pass
 
     window.close()
+
+    print("HERE")
+    print(log.logfile_path)
+    print("HERE")
 
     if log.logfile_path is not None:
         log.write_log()
